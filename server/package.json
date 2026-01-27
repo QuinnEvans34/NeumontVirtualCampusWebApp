@@ -1,0 +1,13 @@
+{
+  "name": "server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "typescript": "^5.5.4"
+  }
+}

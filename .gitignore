@@ -1,0 +1,14 @@
+.DS_Store
+Thumbs.db
+*.log
+
+node_modules
+dist
+dist-ssr
+.env
+.env.local
+bun.lockb
+
+.vscode/*
+!.vscode/extensions.json
+.idea
