@@ -18,13 +18,7 @@ function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>Phaser + React</h1>
-        <p>Phaser should render the main map with a movable player.</p>
-      </header>
-      <div className="game-wrapper">
-        <div ref={containerRef} className="game-container" />
-      </div>
+      <div ref={containerRef} className="game-container" />
       <ChatPanel />
     </div>
   )

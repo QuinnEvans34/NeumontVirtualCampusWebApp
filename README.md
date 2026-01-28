@@ -4,12 +4,12 @@
 
 Prerequisites:
 - Bun installed (https://bun.sh)
-- Node.js is also acceptable for client tooling, but Bun is recommended
+- Node.js installed (required for client tooling)
 
 From the repo root, run:
 
 ```powershell
-./runapp.ps1
+.\runapp.ps1
 ```
 
 This script:
@@ -21,6 +21,8 @@ When everything is running:
 - Server health: http://localhost:3001/health
 
 To stop the app, close the two PowerShell windows that were opened.
+
+Note: This setup is subject to change at dev-team discretion.
 
 This repo contains a React + Phaser client and a Bun WebSocket server.
 

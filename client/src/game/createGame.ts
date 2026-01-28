@@ -13,14 +13,18 @@ export function createGame(parent: HTMLDivElement) {
     currentGame = null
   }
 
+  const width = parent.clientWidth || window.innerWidth
+  const height = parent.clientHeight || window.innerHeight
+
   currentGame = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
-    width: 800,
-    height: 450,
+    width,
+    height,
     backgroundColor: '#0f172a',
     pixelArt: true,
     roundPixels: true,
+    antialias: false,
     physics: {
       default: 'arcade',
       arcade: {
@@ -29,8 +33,7 @@ export function createGame(parent: HTMLDivElement) {
       },
     },
     scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
+      mode: Phaser.Scale.RESIZE,
     },
     scene: [WorldScene],
   })

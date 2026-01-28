@@ -6,16 +6,30 @@ $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Write-Host "Starting Neumont Virtual Campus..." -ForegroundColor Cyan
 Write-Host "Repo root: $repoRoot"
 
+# Prerequisite checks
+if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
+  Write-Host "ERROR: Bun is not installed. Please install Bun from https://bun.sh and try again." -ForegroundColor Red
+  exit 1
+}
+
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+  Write-Host "ERROR: Node.js/npm is not installed. Please install Node.js from https://nodejs.org and try again." -ForegroundColor Red
+  exit 1
+}
+
+$serverPath = Join-Path $repoRoot "server"
+$clientPath = Join-Path $repoRoot "client"
+
 # Start the Bun server in a new PowerShell window
 Write-Host "Launching server (bun install + bun run dev)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location -Path `"$repoRoot\\server`"; bun install; bun run dev"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location -Path `"$serverPath`"; bun install; bun run dev"
 
 # Give the server a moment to boot before starting the client
 Start-Sleep -Seconds 2
 
-# Start the Vite client in a new PowerShell window
-Write-Host "Launching client (bun install + bun run dev)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location -Path `"$repoRoot\\client`"; bun install; bun run dev"
+# Start the Vite client in a new PowerShell window (npm tooling)
+Write-Host "Launching client (npm install + npm run dev)..." -ForegroundColor Yellow
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location -Path `"$clientPath`"; npm install; npm run dev"
 
 Write-Host ""
 Write-Host "All set!" -ForegroundColor Green

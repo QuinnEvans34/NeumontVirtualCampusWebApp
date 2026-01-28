@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
 
-const DEFAULT_MAP_FILE = 'main-floor.json'
-const MAP_BASE_URL = '/assets/maps/floors/'
-const TILESET_KEY = 'neumont-tileset'
-const TILESET_IMAGE_URL = '/assets/tilesets/neumont/neumont_tileset_32.png'
+const DEFAULT_MAP_FILE = 'neumont_main.json'
+const MAP_BASE_URL = '/maps/'
+const TILESET_KEY = 'neumont_tileset_32'
+const TILESET_IMAGE_URL = '/assets/neumont_tileset_32.png'
 const TILESET_EXPECTED_NAME = 'neumont_tileset_32'
 const PLAYER_TEXTURE_KEY = 'player_placeholder'
 
@@ -28,6 +28,7 @@ export default class WorldScene extends Phaser.Scene {
   private isTransitioning = false
   private portalCooldownUntil = 0
   private playerTextureReady = false
+  private resizeHandler: (() => void) | null = null
 
   constructor() {
     super('world')
@@ -93,11 +94,14 @@ export default class WorldScene extends Phaser.Scene {
     this.load.once(Phaser.Loader.Events.COMPLETE, () => {
       this.buildMap(mapKey, fileName, spawnName)
     })
-    this.load.once(Phaser.Loader.Events.FILE_LOAD_ERROR, (file: Phaser.Loader.File) => {
-      const source = file?.src ?? fileName
-      console.error(`Failed to load map JSON from ${source}.`)
-      this.isTransitioning = false
-    })
+    this.load.once(
+      Phaser.Loader.Events.FILE_LOAD_ERROR,
+      (file: Phaser.Loader.File) => {
+        const source = file?.src ?? fileName
+        console.error(`Failed to load map JSON from ${source}.`)
+        this.isTransitioning = false
+      }
+    )
 
     if (!this.load.isLoading()) {
       this.load.start()
@@ -145,11 +149,7 @@ export default class WorldScene extends Phaser.Scene {
     const spawn = this.findSpawnPoint(map, spawnName)
     this.ensurePlayer(spawn)
 
-    this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
-    if (this.player) {
-      this.cameras.main.startFollow(this.player, true, 0.15, 0.15)
-    }
-    this.cameras.main.setBackgroundColor('#0f172a')
+    this.configureCamera(map)
 
     const player = this.player
     if (player) {
@@ -186,7 +186,10 @@ export default class WorldScene extends Phaser.Scene {
     }
 
     this.player.setSize(colliderSize, colliderSize)
-    this.player.setOffset((playerSize - colliderSize) / 2, playerSize - colliderSize)
+    this.player.setOffset(
+      (playerSize - colliderSize) / 2,
+      playerSize - colliderSize
+    )
   }
 
   private createPortals(map: Phaser.Tilemaps.Tilemap) {
@@ -232,7 +235,8 @@ export default class WorldScene extends Phaser.Scene {
         () => {
           this.tryPortalTransition({
             targetMap: resolvedMap,
-            targetSpawn: typeof targetSpawn === 'string' ? targetSpawn : undefined,
+            targetSpawn:
+              typeof targetSpawn === 'string' ? targetSpawn : undefined,
           })
         },
         undefined,
@@ -265,7 +269,7 @@ export default class WorldScene extends Phaser.Scene {
     const normalized = targetMap.trim()
     const lower = normalized.toLowerCase()
     const aliasMap: Record<string, string> = {
-      main: 'main-floor.json',
+      main: 'neumont_main.json',
       basement: 'neumont_basement.json',
       floor2: 'neumont_floor2.json',
       floor3: 'neumont_floor3.json',
@@ -345,6 +349,7 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   private applyCollision(layer: Phaser.Tilemaps.TilemapLayer) {
+    layer.setCollisionByProperty({ collision: true })
     layer.setCollisionByProperty({ collides: true })
     let hasCollision = false
     layer.forEachTile((tile) => {
@@ -361,5 +366,41 @@ export default class WorldScene extends Phaser.Scene {
     if (!hasCollision && shouldForceCollision) {
       layer.setCollisionByExclusion([-1])
     }
+
+    if (layerName.includes('collision')) {
+      layer.setVisible(false)
+    }
+  }
+
+  private configureCamera(map: Phaser.Tilemaps.Tilemap) {
+    const camera = this.cameras.main
+    const mapWidth = map.widthInPixels
+    const mapHeight = map.heightInPixels
+
+    camera.setBounds(0, 0, mapWidth, mapHeight)
+    if (this.player) {
+      camera.startFollow(this.player, true, 0.1, 0.1)
+    }
+    camera.setBackgroundColor('#0f172a')
+    camera.roundPixels = true
+
+    const updateZoom = () => {
+      const scaleW = this.scale.width
+      const scaleH = this.scale.height
+      const zoom = Math.min(scaleW / mapWidth, scaleH / mapHeight)
+      camera.setZoom(Math.min(1, zoom))
+    }
+
+    updateZoom()
+
+    if (this.resizeHandler) {
+      this.scale.off('resize', this.resizeHandler)
+    }
+
+    this.resizeHandler = () => {
+      updateZoom()
+    }
+
+    this.scale.on('resize', this.resizeHandler)
   }
 }
