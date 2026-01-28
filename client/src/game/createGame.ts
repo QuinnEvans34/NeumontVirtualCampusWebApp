@@ -34,6 +34,7 @@ export function createGame(parent: HTMLDivElement) {
     },
     scale: {
       mode: Phaser.Scale.RESIZE,
+      autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     scene: [WorldScene],
   })

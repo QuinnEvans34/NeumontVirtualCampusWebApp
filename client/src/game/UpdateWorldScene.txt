@@ -1,23 +1,33 @@
 import Phaser from 'phaser'
 
+// --- Naming + paths (align with ASSETS_DROPZONE_README + REQUIREMENTS) ---
 const DEFAULT_MAP_FILE = 'main-floor.json'
 const MAP_BASE_URL = '/assets/maps/floors/'
 const TILESET_KEY = 'neumont_tileset_32'
 const TILESET_IMAGE_URL = '/assets/tilesets/neumont/neumont_tileset_32.png'
 const TILESET_EXPECTED_NAME = 'neumont_tileset_32'
 const TILE_SIZE = 32
+
 const PLAYER_TEXTURE_KEY = 'player_placeholder'
 const DEV_MODE = typeof import.meta !== 'undefined' && !!import.meta.env?.DEV
 const DEBUG_OVERLAYS_DEFAULT = false
 const MIN_CAMERA_ZOOM = 0.5
 const MAX_CAMERA_ZOOM = 1
+
+// --- Visual polish toggles ---
 const ENABLE_AUTO_DECALS = true
 const AUTO_DECAL_DENSITY = 0.035
-const FLOOR_LAYER_NAMES = ['ground', 'floor']
+
+// Tileset-local tile indices for decals (NOT global gids). Fill these in once you know them.
+// Example: if your tileset has floor tiles at local 0..7, decals might start at 40+.
 const DECAL_TILE_LOCAL_IDS: number[] = [
   // TODO: replace with real tile indices from neumont_tileset_32
-  40, 41, 42, 43, 44, 45,
+  // 40, 41, 42, 43
 ]
+
+// The first 8 tiles are reserved for floor variants (tools/variantFloorTiles.js assumes 8 variants) :contentReference[oaicite:11]{index=11}
+const FLOOR_VARIANT_LOCAL_MAX_EXCLUSIVE = 8
+const FLOOR_LAYER_NAMES = ['ground', 'floor']
 
 type SpawnPoint = { x: number; y: number }
 type PortalDefinition = { targetMap: string; targetSpawn?: string }
@@ -161,6 +171,7 @@ export default class WorldScene extends Phaser.Scene {
       return
     }
 
+    // Build layers + enforce consistent depth
     map.layers.forEach((layerData) => {
       const layerType = (layerData as { type?: string }).type
       if (layerType && layerType !== 'tilelayer') return
@@ -264,7 +275,10 @@ export default class WorldScene extends Phaser.Scene {
     const portalObjects =
       portalLayer?.objects ??
       objectsLayer?.objects?.filter((obj) =>
-        (obj.type ?? obj.name ?? '').toString().toLowerCase().includes('portal')
+        (obj.type ?? obj.name ?? '')
+          .toString()
+          .toLowerCase()
+          .includes('portal')
       ) ??
       []
 
@@ -398,7 +412,9 @@ export default class WorldScene extends Phaser.Scene {
       )
       let spawnObject =
         normalizedSpawnName &&
-        spawnObjects.find((obj) => obj.name?.toLowerCase() === normalizedSpawnName)
+        spawnObjects.find(
+          (obj) => obj.name?.toLowerCase() === normalizedSpawnName
+        )
 
       if (!spawnObject && normalizedSpawnName) {
         if (defaultSpawn) {
@@ -540,6 +556,31 @@ export default class WorldScene extends Phaser.Scene {
     }
   }
 
+  private getLayerDepth(name: string): number {
+    const n = (name ?? '').toLowerCase()
+
+    // collision invisible anyway, but keep it low
+    if (n.includes('collision')) return -100
+
+    // floor/ground at the bottom
+    if (n.includes('ground') || n.includes('floor')) return 0
+
+    // decals/details above floor
+    if (n.includes('decal') || n.includes('detail') || n.includes('trim'))
+      return 10
+
+    // walls/buildings above decals
+    if (n.includes('wall') || n.includes('building') || n.includes('structure'))
+      return 20
+
+    // foreground/overhead highest
+    if (n.includes('foreground') || n.includes('overhead') || n.includes('top'))
+      return 30
+
+    // default mid
+    return 15
+  }
+
   private addAutoDecals(
     map: Phaser.Tilemaps.Tilemap,
     tileset: Phaser.Tilemaps.Tileset,
@@ -553,6 +594,7 @@ export default class WorldScene extends Phaser.Scene {
     )
     if (!floorLayer) return
 
+    // Collect collision positions across all layers
     const colliding = new Set<string>()
     this.tileLayers.forEach((layer) => {
       layer.forEachTile((tile) => {
@@ -570,10 +612,12 @@ export default class WorldScene extends Phaser.Scene {
       return false
     }
 
+    // Deterministic RNG per-map
     const seed = this.hashStringToInt(fileName)
     const rng = this.makeMulberry32(seed)
 
-    const decalLayer = map.createBlankLayer(
+    // Create a blank decals layer above floor but below walls
+    const decalsLayer = map.createBlankLayer(
       'Decals_Auto',
       tileset,
       0,
@@ -583,21 +627,29 @@ export default class WorldScene extends Phaser.Scene {
       map.tileWidth,
       map.tileHeight
     )
-    if (!decalLayer) return
-    decalLayer.setDepth(this.getLayerDepth('decals'))
-    this.tileLayers.push(decalLayer)
+    if (!decalsLayer) return
+    decalsLayer.setDepth(this.getLayerDepth('decals'))
+    this.tileLayers.push(decalsLayer)
 
     for (let y = 0; y < map.height; y += 1) {
       for (let x = 0; x < map.width; x += 1) {
         const base = floorLayer.getTileAt(x, y)
         if (!base) continue
+
+        // Only decorate floor-variant tiles (local 0..7)
+        const localIndex = base.index // local to tileset in Phaser
+        if (
+          localIndex < 0 ||
+          localIndex >= FLOOR_VARIANT_LOCAL_MAX_EXCLUSIVE
+        )
+          continue
+
         if (colliding.has(`${x},${y}`)) continue
         if (isNearCollision(x, y)) continue
         if (rng() > AUTO_DECAL_DENSITY) continue
 
         const decalLocal = decals[Math.floor(rng() * decals.length)]
-        if (typeof decalLocal !== 'number') continue
-        decalLayer.putTileAt(decalLocal, x, y)
+        decalsLayer.putTileAt(decalLocal, x, y)
       }
     }
   }
@@ -619,13 +671,13 @@ export default class WorldScene extends Phaser.Scene {
     return FLOOR_LAYER_NAMES.some((label) => lowered.includes(label))
   }
 
-  private hashStringToInt(value: string): number {
-    let hash = 2166136261
-    for (let i = 0; i < value.length; i += 1) {
-      hash ^= value.charCodeAt(i)
-      hash = Math.imul(hash, 16777619)
+  private hashStringToInt(str: string): number {
+    let h = 2166136261
+    for (let i = 0; i < str.length; i += 1) {
+      h ^= str.charCodeAt(i)
+      h = Math.imul(h, 16777619)
     }
-    return hash >>> 0
+    return h >>> 0
   }
 
   private makeMulberry32(seed: number) {
@@ -636,23 +688,6 @@ export default class WorldScene extends Phaser.Scene {
       r ^= r + Math.imul(r ^ (r >>> 7), 61 | r)
       return ((r ^ (r >>> 14)) >>> 0) / 4294967296
     }
-  }
-
-  private getLayerDepth(name: string): number {
-    const normalized = (name ?? '').toLowerCase()
-
-    if (normalized.includes('ground') || normalized.includes('floor')) return 0
-    if (normalized.includes('decal') || normalized.includes('detail')) return 10
-    if (
-      normalized.includes('wall') ||
-      normalized.includes('structure') ||
-      normalized.includes('building')
-    )
-      return 20
-    if (normalized.includes('foreground') || normalized.includes('overhead'))
-      return 30
-
-    return 5
   }
 
   private configureCamera(map: Phaser.Tilemaps.Tilemap) {

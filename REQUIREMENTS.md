@@ -122,9 +122,9 @@ The following assets should be present in the project:
 - **Tilesets:** `client/public/assets/tilesets/neumont/neumont_tileset_32.png` ✓
 - **Maps:** `client/public/assets/maps/floors/` containing:
   - `main-floor.json` ✓
-  - `neumont_basement.json` ✓
-  - `neumont_floor2.json` ✓
-  - `neumont_floor3.json` ✓
+  - `basement-floor.json` ✓
+  - `floor2.json` ✓
+  - `floor3.json` ✓
 - **Sprites:** (optional, folders exist but empty)
   - `client/public/assets/sprites/characters/`
   - `client/public/assets/sprites/npcs/`

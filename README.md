@@ -51,6 +51,14 @@ set VITE_WS_URL=ws://localhost:3001/ws
 npm run dev
 ```
 
+## Map Orientation (Tiled)
+
+The Neumont building frontage faces Main Street and should appear at the **bottom of the screen** in-game.
+
+- In Tiled, keep north pointing up and place the storefront edge on the **bottom** side of the map.
+- Do not rotate exported JSON manually; edit in the oriented view and export as-is.
+- Keep spawns/portals in object layers with their existing names so transitions stay reliable.
+
 ## Server (Bun + TypeScript)
 
 ```bash
